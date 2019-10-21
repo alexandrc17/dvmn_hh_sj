@@ -106,7 +106,7 @@ def get_average_salary_sj(vacancy):
 
 
 def make_table_sj(vacancies):
-    title = 'SuperJob'
+    title = 'SuperJob St.-P.'
 
     table_data = [
         ['Язык программирования', 'Ваканский найдено', 'Вакансий обработано', 'Средняя зарплата'],
@@ -122,7 +122,7 @@ def make_table_sj(vacancies):
 
 
 def make_table_hh(vacancies):
-    title = 'HeadHunter'
+    title = 'HeadHunter St.-P.'
 
     table_data = [
         ['Язык программирования', 'Ваканский найдено', 'Вакансий обработано', 'Средняя зарплата'],
