@@ -19,6 +19,7 @@ def get_all_pages_hh(vacancy):
             data.append(items[i])
     return data
 
+
 def predict_rub_salary_hh(vacancy):
     data = get_all_pages_hh(vacancy)
     salary = []
