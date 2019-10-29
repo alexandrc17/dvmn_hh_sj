@@ -1,92 +1,104 @@
 import requests
 from terminaltables import AsciiTable
+from dotenv import load_dotenv
+import os
 
 
 def get_all_pages_hh(vacancy):
     url = "https://api.hh.ru/vacancies"
     page = 0
     pages = 1
-    data = []
+    vacancies = []
     response = requests.get(url, params={'text': vacancy, 'area': 2})
     response.raise_for_status()
     while page < pages:
         page_response = requests.get(url, params={'text': vacancy, 'area': 2, 'page': page})
         page_response.raise_for_status()
-        pages = page_response.json()['pages']
+        data_vacancy = page_response.json()
+        pages = data_vacancy['pages']
         page += 1
-        items = page_response.json()['items']
-        for i in range(len(items)):
-            data.append(items[i])
-    return data
+        items = data_vacancy['items']
+        count_items = len(items)
+        for i in range(count_items):
+            vacancies.append(items[i])
+    return vacancies
 
 
 def predict_rub_salary_hh(vacancy):
-    data = get_all_pages_hh(vacancy)
-    salary = []
-    for i in range(len(data)):
-        if data[i]['salary'] == None or data[i]['salary']['currency'] != "RUR":
-          continue
-        elif data[i]['salary']['to'] == None:
-          salary.append(data[i]['salary']['from']*1.2)
-        elif data[i]['salary']['from'] == None:
-          salary.append(data[i]['salary']['to']*0.8)
+    vacancies = get_all_pages_hh(vacancy)
+    average_salary_a = []
+    for vacancy in vacancies:
+        if vacancy['salary'] is None:
+            continue
         else:
-          salary.append((data[i]['salary']['to'] + data[i]['salary']['from'])/2)
-    return salary
+            salary_from = vacancy["salary"]["from"]
+            salary_to = vacancy["salary"]["to"]
+            average_salary_a.append(predict_salary(salary_from, salary_to))
+    return average_salary_a
 
 
 def get_average_salary_hh(vacancy):
     url = "https://api.hh.ru/vacancies"
-    average = {}
+    average = []
     response = requests.get(url, params={'text': vacancy, 'area': 2})
     response.raise_for_status()
     salary = predict_rub_salary_hh(vacancy)
     average_salary = int(sum(salary)/len(salary))
-    average['vacancies_found'] = response.json()['found']
-    average['vacancies_processed'] = len(salary)
-    average['average_salary'] = average_salary
+    average.append(response.json()['found'])
+    average.append(len(salary))
+    average.append(average_salary)
     return average
 
 
 def get_all_pages_sj(vacancy):
+    load_dotenv()
+    token = os.getenv("TOKEN_SJ")
     page = 0
     url = "https://api.superjob.ru/2.0/vacancies"
-    headers = {"X-Api-App-Id": "v3.r.119100491.3d0fff6c37efbbc33054cc66e2afc94d10395b35.7922632be90283e6a4112316c51a98d15c16a052"}
+    headers = {"X-Api-App-Id": token}
     params = {"keyword": vacancy,
               "town": "14",
               "count": "100",
               "page": page}
     data = []
-    response = requests.get(url, headers=headers, params = params)
-    items = response.json()["objects"]
-    for i in range(len(items)):
+    response = requests.get(url, headers=headers, params=params)
+    data_vacancies = response.json()
+    items = data_vacancies["objects"]
+    count_items = len(items)
+    for i in range(count_items):
         data.append(items[i])
-    while response.json()['more'] == True:
+    while data_vacancies['more'] is True:
         page += 1
         response = requests.get(url, headers=headers, params={"keyword": vacancy, "town": "14", 'page': page, "count": "100"})
         items = response.json()['objects']
-        for i in range(len(items)):
+        count_items = len(items)
+        for i in range(count_items):
             data.append(items[i])
     return data
 
 
-def predict_rub_salary_for_sj(vacancy):
-    data = get_all_pages_sj(vacancy)
-    salary = []
-    for i in range(len(data)):
-        if data[i]['payment'] == 0 or data[i]['payment'] == None:
-            if data[i]['payment_from'] == 0 and data[i]['payment_to'] == 0:
-                 continue
-            elif data[i]['payment_from'] == 0:
-                payment = int((data[i]['payment_to']*0.8))
-            elif data[i]['payment_to'] == 0:
-                payment = int((data[i]['payment_from']*1.2))
-            else:
-                payment = int((data[i]['payment_from'] + data[i]['payment_to']) / 2)
-        else:
-            payment = data[i]['payment']
-        salary.append(payment)
+def predict_salary(salary_from, salary_to):
+    if salary_to is None:
+        salary = salary_from * 1.2
+    elif salary_from is None:
+        salary = salary_to * 0.8
+    else:
+        salary = (salary_to + salary_from) / 2
     return salary
+
+
+def predict_rub_salary_for_sj(vacancy):
+    vacancies = get_all_pages_sj(vacancy)
+    average_salary_a = []
+    for vacancy in vacancies:
+        salary_from = vacancy['payment_from']
+        salary_to = vacancy['payment_to']
+        if vacancy['payment'] == 0 or vacancy['payment'] is None:
+            average_salary_a.append(predict_salary(salary_from, salary_to))
+        else:
+            payment = vacancy['payment']
+            average_salary_a.append(payment)
+    return average_salary_a
 
 
 def get_average_salary_sj(vacancy):
@@ -94,62 +106,46 @@ def get_average_salary_sj(vacancy):
     headers = {"X-Api-App-Id": "v3.r.119100491.3d0fff6c37efbbc33054cc66e2afc94d10395b35.7922632be90283e6a4112316c51a98d15c16a052"}
     params = {"keyword": vacancy,
               "town": "14"}
-    average = {}
+    average = []
     response = requests.get(url, headers=headers, params=params)
     response.raise_for_status()
     salary = predict_rub_salary_for_sj(vacancy)
     average_salary = int(sum(salary)/len(salary))
-    average['vacancies_found'] = response.json()['total']
-    average['vacancies_processed'] = len(salary)
-    average['average_salary'] = average_salary
+    average.append(response.json()['total'])
+    average.append(len(salary))
+    average.append(average_salary)
     return average
 
 
-def make_table_sj(vacancies):
-    title = 'SuperJob St.-P.'
-
-    table_data = [
-        ['Язык программирования', 'Ваканский найдено', 'Вакансий обработано', 'Средняя зарплата'],
-        [list(vacancies.keys())[0], list(vacancies.values())[0]["vacancies_found"],
-         list(vacancies.values())[0]['vacancies_processed'], list(vacancies.values())[0]['average_salary']],
-        [list(vacancies.keys())[1], list(vacancies.values())[1]["vacancies_found"],
-         list(vacancies.values())[1]['vacancies_processed'], list(vacancies.values())[1]['average_salary']],
-        [list(vacancies.keys())[2], list(vacancies.values())[2]["vacancies_found"],
-         list(vacancies.values())[2]['vacancies_processed'], list(vacancies.values())[2]['average_salary']],
+def make_table(title_table):
+    languages = [
+        'Java',
+        'C++',
+        'Python',
+        'Php',
+        'C',
+        'C#',
     ]
-    table = AsciiTable(table_data, title)
-    print(table.table)
 
-
-def make_table_hh(vacancies):
-    title = 'HeadHunter St.-P.'
-
-    table_data = [
-        ['Язык программирования', 'Ваканский найдено', 'Вакансий обработано', 'Средняя зарплата'],
-        [list(vacancies.keys())[0], list(vacancies.values())[0]["vacancies_found"],
-         list(vacancies.values())[0]['vacancies_processed'], list(vacancies.values())[0]['average_salary']],
-        [list(vacancies.keys())[1], list(vacancies.values())[1]["vacancies_found"],
-         list(vacancies.values())[1]['vacancies_processed'], list(vacancies.values())[1]['average_salary']],
-        [list(vacancies.keys())[2], list(vacancies.values())[2]["vacancies_found"],
-         list(vacancies.values())[2]['vacancies_processed'], list(vacancies.values())[2]['average_salary']],
-    ]
-    table = AsciiTable(table_data, title)
-    print(table.table)
+    table_data = [['Язык программирования', 'Ваканский найдено', 'Вакансий обработано', 'Средняя зарплата']]
+    for language in languages:
+        table_row = [language]
+        if title_table.find("unter") == -1:
+            info = get_average_salary_sj("Программист "+language)
+        elif title_table.find("unter") > 0:
+            info = get_average_salary_hh("Программист "+language)
+        table_row.append(info[0])
+        table_row.append(info[1])
+        table_row.append(info[2])
+        table_data.append(table_row)
+    return AsciiTable(table_data, title_table).table
 
 
 def main():
-    vacancies = {}
-    vacancies["Python"] = get_average_salary_sj("Программист Python")
-    vacancies["Java"] = get_average_salary_sj("Программист Java")
-    vacancies["C++"] = get_average_salary_sj("Программист C++")
-    make_table_sj(vacancies)
-
-    vacancies_hh = {}
-    vacancies_hh["Python"] = get_average_salary_hh("Программист Python")
-    vacancies_hh["Java"] = get_average_salary_hh("Программист Java")
-    vacancies_hh["C++"] = get_average_salary_hh("Программист C++")
-    make_table_hh(vacancies_hh)
+    print(make_table("Superjob"))
+    print(make_table("HeadHunter"))
 
 
 main()
+
 
