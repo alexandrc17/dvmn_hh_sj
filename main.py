@@ -18,9 +18,7 @@ def get_all_pages_hh(vacancy):
         pages = data_vacancy['pages']
         page += 1
         items = data_vacancy['items']
-        count_items = len(items)
-        for i in range(count_items):
-            vacancies.append(items[i])
+        vacancies.extend(items)
     return vacancies
 
 
@@ -51,7 +49,6 @@ def get_average_salary_hh(vacancy):
 
 
 def get_all_pages_sj(vacancy):
-    load_dotenv()
     token = os.getenv("TOKEN_SJ")
     page = 0
     url = "https://api.superjob.ru/2.0/vacancies"
@@ -60,21 +57,17 @@ def get_all_pages_sj(vacancy):
               "town": "14",
               "count": "100",
               "page": page}
-    data = []
+    vacancies = []
     response = requests.get(url, headers=headers, params=params)
     data_vacancies = response.json()
     items = data_vacancies["objects"]
-    count_items = len(items)
-    for i in range(count_items):
-        data.append(items[i])
+    vacancies.extend(items)
     while data_vacancies['more'] is True:
         page += 1
         response = requests.get(url, headers=headers, params={"keyword": vacancy, "town": "14", 'page': page, "count": "100"})
         items = response.json()['objects']
-        count_items = len(items)
-        for i in range(count_items):
-            data.append(items[i])
-    return data
+        vacancies.extend(items)
+    return vacancies
 
 
 def predict_salary(salary_from, salary_to):
@@ -142,6 +135,7 @@ def make_table(title_table):
 
 
 def main():
+    load_dotenv()
     print(make_table("Superjob"))
     print(make_table("HeadHunter"))
 
